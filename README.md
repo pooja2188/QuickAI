@@ -32,7 +32,7 @@ A creative media studio translating descriptive prompts into beautiful digital a
 
 ### 7. AI Background Cutout Isolation
 An automated editing module that strips the background layer off uploaded imagery assets natively.
-![AI Background Removal](./screenShots/BackgroundRemvo...png)
+![AI Background Removal](./screenShots/BackgroundRemoval.png)
 
 ### 8. Generative Object Eraser (Inpainting)
 An intelligent canvas editor utilizing context-aware generative infilling to mask out specified elements.
@@ -96,7 +96,7 @@ DATABASE_URL=your_postgresql_connection_string_uri
 PORT=5000
 ```
 
-<h3>3. Frontend Client Environment Setup (`/client/.env`)</h3>
+### 3. Frontend Client Environment Setup (`/client/.env`)
 Create a file named `.env` inside your root `client` folder path and assign these tracking variables:
 ```env
 VITE_CLERK_PUBLISHABLE_KEY=your_clerk_public_publishable_key_string
