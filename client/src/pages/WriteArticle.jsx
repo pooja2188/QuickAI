@@ -19,25 +19,66 @@ const WriteArticle = () => {
   const [content,setContent]=useState('')
 
   const {getToken}=useAuth()
-  const onSubmitHandler = async (e) => {
-    e.preventDefault();
-    try{
-      setLoading(true)
-      const prompt=`Write an article about ${input} in ${selectedLength.text}`
-      const {data}=await axios.post('/api/ai/generate-article',{
-        prompt, length:selectedLength.length},{
-          headers:{Authorization:`Bearer ${await getToken()}`}
-        })
-      if(data.success){
-        setContent(data.content)
-      } else {
-        toast.error(data.message)
-      }
-    }catch(error){
-      toast.error(error.message)
+  // const onSubmitHandler = async (e) => {
+  //   e.preventDefault();
+  //   try{
+  //     setLoading(true)
+  //     const prompt=`Write an article about ${input} in ${selectedLength.text}`
+  //     const {data}=await axios.post('/api/ai/generate-article',{
+  //       prompt, length:selectedLength.length},{
+  //         headers:{Authorization:`Bearer ${await getToken()}`}
+  //       })
+  //     if(data.success){
+  //       setContent(data.content)
+  //     } else {
+  //       toast.error(data.message)
+  //     }
+  //   }catch(error){
+  //     toast.error(error.message)
+  //   }
+  //   setLoading(false)
+  // };
+
+   const onSubmitHandler = async (e) => {
+  e.preventDefault();
+  try {
+    setLoading(true);
+    
+    // 1. Fetch the token and verify it exists
+    const token = await getToken();
+    if (!token) {
+      toast.error("Clerk session not found. Please log in again.");
+      setLoading(false);
+      return;
     }
-    setLoading(false)
-  };
+
+    // 2. Clear out redundant framing text; pass raw input
+    const { data } = await axios.post(
+      '/api/ai/generate-article',
+      { 
+        prompt: input, // Send just the clean topic text
+        length: selectedLength.length 
+      },
+      {
+        headers: { 
+          Authorization: `Bearer ${token}` // Token is safely passed here
+        }
+      }
+    );
+
+    if (data.success) {
+      setContent(data.content);
+    } else {
+      toast.error(data.message);
+    }
+  } catch (error) {
+    // Gracefully handle Axios error responses
+    const errMsg = error.response?.data?.message || error.message;
+    toast.error(errMsg);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="h-full overflow-y-scroll p-6 flex items-start flex-wrap gap-4 text-slate-700">

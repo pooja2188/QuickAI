@@ -308,31 +308,71 @@ const Generateimages = () => {
   const [content, setContent] = useState("");
   const { getToken } = useAuth();
 
-  const onSubmitHandler = async (e) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      setContent(""); 
+  // const onSubmitHandler = async (e) => {
+  //   e.preventDefault();
+  //   try {
+  //     setLoading(true);
+  //     setContent(""); 
       
-      const response = await axios.post(
-        "/api/ai/generate-image",
-        { prompt: input, style: selectedStyle, publish },
-        { headers: { Authorization: `Bearer ${await getToken()}` } },
-      );
+  //     const response = await axios.post(
+  //       "/api/ai/generate-image",
+  //       { prompt: input, style: selectedStyle, publish },
+  //       { headers: { Authorization: `Bearer ${await getToken()}` } },
+  //     );
 
-      if (response.data && response.data.success) {
-        setContent(response.data.content);
-        toast.success("AI Image generated successfully!");
-      } else {
-        toast.error(response.data?.message || "Generation failed.");
-      }
-    } catch (error) {
-      const errorMsg = error.response?.data?.message || error.message;
-      toast.error(errorMsg);
-    } finally {
+  //     if (response.data && response.data.success) {
+  //       setContent(response.data.content);
+  //       toast.success("AI Image generated successfully!");
+  //     } else {
+  //       toast.error(response.data?.message || "Generation failed.");
+  //     }
+  //   } catch (error) {
+  //     const errorMsg = error.response?.data?.message || error.message;
+  //     toast.error(errorMsg);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+  const onSubmitHandler = async (e) => {
+  e.preventDefault();
+  if (!input) return toast.error("Please provide a prompt description.");
+
+  try {
+    setLoading(true);
+    setContent(""); 
+    
+    const token = await getToken();
+    if (!token) {
+      toast.error("Clerk session context missing. Please refresh your page.");
       setLoading(false);
+      return;
     }
-  };
+
+    // ✨ ENHANCEMENT: Combine description with selection style context for Clipdrop
+    const compiledPrompt = `${input}, ${selectedStyle}`;
+
+    const response = await axios.post(
+      "/api/ai/generate-image",
+      { prompt: compiledPrompt, publish },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    if (response.data && response.data.success) {
+      setContent(response.data.content);
+      toast.success("AI Image generated successfully!");
+    } else {
+      // ✨ FIX: Fallback to the 'error' key if 'message' is absent inside custom payloads
+      toast.error(response.data?.message || response.data?.error || "Generation failed.");
+    }
+  } catch (error) {
+    // ✨ FIX: Match custom Express handling syntax rules precisely
+    const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message;
+    toast.error(errorMsg);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="h-full overflow-y-scroll p-6 flex items-start flex-wrap gap-4 text-slate-700 bg-slate-50/20">

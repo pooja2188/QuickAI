@@ -153,10 +153,79 @@ export const generateBlogTitle = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+ 
+// export const generateImage = async (req, res) => {
+//   try {
+//     const authData = req.auth();
+//     const userId = authData?.userId;
+
+//     if (!userId) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Authentication failed! Missing Session Token.",
+//       });
+//     }
+
+//     const { prompt, publish } = req.body;
+//     const plan = req.plan;
+
+//     if (plan !== "premium") {
+//       return res.json({
+//         success: false,
+//         message: "This feature is only available for premium subscriptions.",
+//       });
+//     }
+//     console.log("API Key Check:", process.env.CLIPDROP_API_KEY ? "Key is visible to this file" : "Key is UNDEFINED");
+
+//     const formData = new FormData();
+//     formData.append('prompt', prompt);
+
+//     // Ensure this string is exactly correct and unmutated
+// const { data } = await axios.post("https://clipdrop-api.co/text-to-image/v1", formData, {
+
+//       headers: { 
+//         'x-api-key': process.env.CLIPDROP_API_KEY,
+//         ...formData.getHeaders(), 
+//         // 'Content-Type': `multipart/form-data; boundary=${formData.getBoundary()}`
+//       },
+//       responseType: "arraybuffer"
+//     });
+
+//     const base64Image = `data:image/png;base64,${Buffer.from(data, "binary").toString("base64")}`;
+
+//     // Cloudinary upload works every single time now because the instance is fully configured
+//     const uploadResponse = await cloudinary.uploader.upload(base64Image);
+//     const secure_url = uploadResponse.secure_url;
+
+//     // Save metadata tracking block to database
+//     const isPublished = publish === true || publish === "true";
+
+//     await sql`INSERT INTO creations (user_id, prompt, content, type, publish) VALUES 
+//     (${userId}, ${prompt}, ${secure_url}, 'image', ${isPublished})`;
+
+//     // await sql`INSERT INTO creations (user_id, prompt, content, type, publish) VALUES
+//     // (${userId}, ${prompt}, ${secure_url}, 'image', ${publish ?? false})`;
+
+//     res.json({ success: true, content: secure_url });
+//   } catch (error) {
+//     // console.error("Image generation failed:", error.message);
+//     // res.status(500).json({ success: false, error: error.message });
+//     if (error.response && error.response.data) {
+//       const decoder = new TextDecoder('utf-8');
+//       const errorMessage = decoder.decode(error.response.data);
+//       console.error("Clipdrop Server Error Message:", errorMessage);
+//     } else {
+//       console.error("Image generation failed:", error.message);
+//     }
+    
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// };
 
 export const generateImage = async (req, res) => {
   try {
-    const authData = req.auth();
+    // 1. ✅ FIX: Changed req.auth() function call to direct object reference
+    const authData = req.auth;
     const userId = authData?.userId;
 
     if (!userId) {
@@ -169,76 +238,86 @@ export const generateImage = async (req, res) => {
     const { prompt, publish } = req.body;
     const plan = req.plan;
 
-    if (plan !== "premium") {
+    const userPlan = String(plan || "").toLowerCase();
+    if (!userPlan.includes("premium")) {
       return res.json({
         success: false,
         message: "This feature is only available for premium subscriptions.",
       });
     }
+
     console.log("API Key Check:", process.env.CLIPDROP_API_KEY ? "Key is visible to this file" : "Key is UNDEFINED");
 
-    // Request Image Generation from Clipdrop
-    // const formData = new FormData();
-    // formData.append("prompt", prompt);
+    if (!prompt) {
+      return res.status(400).json({ success: false, message: "Prompt text is required." });
+    }
 
-    // const { data } = await axios.post(
-    //   "https://clipdrop-api.co/text-to-image/v1",
-    //   formData,
-    //   {
-    //     headers: {
-    //       ...formData.getHeaders(),
-    //       "x-api-key": process.env.CLIPDROP_API_KEY,
-    //     },
-    //     responseType: "arraybuffer",
-    //   },
-    // );
-
-        // Request Image Generation from Clipdrop
+    // 2. Build the MultiPart form envelope cleanly
     const formData = new FormData();
     formData.append('prompt', prompt);
 
-    // Ensure this string is exactly correct and unmutated
-const { data } = await axios.post("https://clipdrop-api.co/text-to-image/v1", formData, {
+    // 3. ✅ FIX: Send the request using standard form-data configuration rules
+    const { data } = await axios.post(
+      "https://clipdrop-api.co/text-to-image/v1", 
+      formData, 
+      {
+        headers: { 
+          "x-api-key": process.env.CLIPDROP_API_KEY,
+          // Let form-data build the boundary structure automatically; do not override it manually
+          ...formData.getHeaders() 
+        },
+        responseType: "arraybuffer"
+      }
+    );
 
-      headers: { 
-        'x-api-key': process.env.CLIPDROP_API_KEY,
-        // FIX: Force axios to compute and forward the multipart/form-data boundary signatures
-        ...formData.getHeaders(), 
-        'Content-Type': `multipart/form-data; boundary=${formData.getBoundary()}`
-      },
-      responseType: "arraybuffer"
-    });
-
+    // Convert binary to base64
     const base64Image = `data:image/png;base64,${Buffer.from(data, "binary").toString("base64")}`;
 
-    // Cloudinary upload works every single time now because the instance is fully configured
+    // Cloudinary upload
     const uploadResponse = await cloudinary.uploader.upload(base64Image);
     const secure_url = uploadResponse.secure_url;
 
-    // Save metadata tracking block to database
-    const isPublished = publish === true || publish === "true";
+    // Database safe publishing parsing
+    const isPublished = publish === true || publish === "true" || false;
 
     await sql`INSERT INTO creations (user_id, prompt, content, type, publish) VALUES 
     (${userId}, ${prompt}, ${secure_url}, 'image', ${isPublished})`;
 
-    // await sql`INSERT INTO creations (user_id, prompt, content, type, publish) VALUES
-    // (${userId}, ${prompt}, ${secure_url}, 'image', ${publish ?? false})`;
+    return res.json({ success: true, content: secure_url });
 
-    res.json({ success: true, content: secure_url });
   } catch (error) {
-    // console.error("Image generation failed:", error.message);
-    // res.status(500).json({ success: false, error: error.message });
+    let finalErrorMessage = error.message;
+
+    // Safe extraction of binary error bodies from Clipdrop
     if (error.response && error.response.data) {
-      const decoder = new TextDecoder('utf-8');
-      const errorMessage = decoder.decode(error.response.data);
-      console.error("Clipdrop Server Error Message:", errorMessage);
+      try {
+        const decoder = new TextDecoder('utf-8');
+        const errorText = decoder.decode(error.response.data);
+        console.error("Clipdrop Server Error Message:", errorText);
+        
+        // Extract real text from the error payload if it exists
+        const parsedError = JSON.parse(errorText);
+        finalErrorMessage = parsedError.error || errorText;
+      } catch (e) {
+        console.error("Failed to parse binary server error response.");
+      }
     } else {
       console.error("Image generation failed:", error.message);
     }
     
-    res.status(500).json({ success: false, error: error.message });
+    // Return a custom explicit validation notice if the account lacks credits
+    if (error.response?.status === 403) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "403 Forbidden: Verify your active Clipdrop dashboard account has credits left!" 
+      });
+    }
+
+    return res.status(500).json({ success: false, error: finalErrorMessage });
   }
 };
+
+
 export const removeImageBackground = async (req, res) => {
   try {
     const authData = req.auth();
@@ -413,3 +492,4 @@ export const resumeReview = async (req, res) => {
     return res.status(500).json({ success: false, message: "Backend process fault: " + error.message });
   }
 };
+
