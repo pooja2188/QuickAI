@@ -6,7 +6,8 @@ import "dotenv/config"; // Must be at the very top of your entry file!
 import { v2 as cloudinary } from "cloudinary";
 import FormData from "form-data";
 import fs from "fs";
-import { PDFParse } from "pdf-parse";
+// import { PDFParse } from "pdf-parse";
+import pdfParse from "pdf-parse";
 
 const AI = new OpenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -437,15 +438,21 @@ export const resumeReview = async (req, res) => {
       });
     }
 
-    const nodeBuffer = fs.readFileSync(resume.path);
-    const dataBuffer = new Uint8Array(nodeBuffer.buffer, nodeBuffer.byteOffset, nodeBuffer.byteLength);
+    // const nodeBuffer = fs.readFileSync(resume.path);
+    // const dataBuffer = new Uint8Array(nodeBuffer.buffer, nodeBuffer.byteOffset, nodeBuffer.byteLength);
     
-    const parser = new PDFParse(dataBuffer);
-    const parsedResult = await parser.getText();
+    // const parser = new PDFParse(dataBuffer);
+    // const parsedResult = await parser.getText();
 
-    if (fs.existsSync(resume.path)) fs.unlinkSync(resume.path);
+    // if (fs.existsSync(resume.path)) fs.unlinkSync(resume.path);
 
-    const rawText = parsedResult?.text || parsedResult || "";
+    // const rawText = parsedResult?.text || parsedResult || "";
+
+     const nodeBuffer = fs.readFileSync(resume.path);
+
+     const parsedResult = await pdfParse(nodeBuffer);
+
+     const rawText = parsedResult.text;
 
     if (!rawText || rawText.trim().length === 0) {
       return res.status(400).json({
