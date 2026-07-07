@@ -6,8 +6,8 @@ import "dotenv/config"; // Must be at the very top of your entry file!
 import { v2 as cloudinary } from "cloudinary";
 import FormData from "form-data";
 import fs from "fs";
-// import { PDFParse } from "pdf-parse";
-import pdfParse from "pdf-parse";
+import { PDFParse } from "pdf-parse";
+// import pdfParse from "pdf-parse";
 
 const AI = new OpenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -438,21 +438,15 @@ export const resumeReview = async (req, res) => {
       });
     }
 
-    // const nodeBuffer = fs.readFileSync(resume.path);
-    // const dataBuffer = new Uint8Array(nodeBuffer.buffer, nodeBuffer.byteOffset, nodeBuffer.byteLength);
+    const nodeBuffer = fs.readFileSync(resume.path);
+    const dataBuffer = new Uint8Array(nodeBuffer.buffer, nodeBuffer.byteOffset, nodeBuffer.byteLength);
     
-    // const parser = new PDFParse(dataBuffer);
-    // const parsedResult = await parser.getText();
+    const parser = new PDFParse(dataBuffer);
+    const parsedResult = await parser.getText();
 
-    // if (fs.existsSync(resume.path)) fs.unlinkSync(resume.path);
+    if (fs.existsSync(resume.path)) fs.unlinkSync(resume.path);
 
-    // const rawText = parsedResult?.text || parsedResult || "";
-
-     const nodeBuffer = fs.readFileSync(resume.path);
-
-     const parsedResult = await pdfParse(nodeBuffer);
-
-     const rawText = parsedResult.text;
+    const rawText = parsedResult?.text || parsedResult || "";
 
     if (!rawText || rawText.trim().length === 0) {
       return res.status(400).json({
@@ -464,23 +458,49 @@ export const resumeReview = async (req, res) => {
     const promptText = `Review the following resume and provide a deep, thorough constructive critique on its strengths, weaknesses, formatting, impact metrics, and keyword optimizations. Format the response beautifully using clean markdown headers and bullet points. Resume Content:\n\n ${rawText}`;
 
     // 1. Dispatch data straight up to Gemini via OpenAI adapter
-    const response = await AI.chat.completions.create({
-      model: "gemini-2.5-flash",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert HR Manager and Technical Recruiter. Provide structural, highly actionable, long-form resume critiques. Always break down your answer into four distinct sections: 1) Executive Summary, 2) Core Strengths, 3) Critical Areas for Improvement, and 4) Actionable Recommendations.",
-        },
-        {
-          role: "user",
-          content: promptText,
-        },
-      ],
-      temperature: 0.7,
-      // FIXED: Hardcoded to 2500 to give the model full headroom to print the entire comprehensive report!
-      max_tokens: 2500, 
-    });
+    // const response = await AI.chat.completions.create({
+    //   model: "gemini-2.5-flash",
+    //   messages: [
+    //     {
+    //       role: "system",
+    //       content: "You are an expert HR Manager and Technical Recruiter. Provide structural, highly actionable, long-form resume critiques. Always break down your answer into four distinct sections: 1) Executive Summary, 2) Core Strengths, 3) Critical Areas for Improvement, and 4) Actionable Recommendations.",
+    //     },
+    //     {
+    //       role: "user",
+    //       content: promptText,
+    //     },
+    //   ],
+    //   temperature: 0.7,
+    //   max_tokens: 2500, 
+    // });
 
+    let response;
+
+try {
+  response = await AI.chat.completions.create({
+    model: "gemini-2.5-flash",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are an expert HR Manager and Technical Recruiter. Provide structural, highly actionable, long-form resume critiques. Always break down your answer into four distinct sections: 1) Executive Summary, 2) Core Strengths, 3) Critical Areas for Improvement, and 4) Actionable Recommendations.",
+      },
+      {
+        role: "user",
+        content: promptText,
+      },
+    ],
+    temperature: 0.7,
+    max_tokens: 2500,
+  });
+} catch (err) {
+  console.error("Gemini API Error:");
+  console.error(err);
+  console.error(err.status);
+  console.error(err.response?.data);
+
+  throw err;
+}
     const content = response.choices[0].message.content;
 
     try {
